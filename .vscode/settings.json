@@ -1,0 +1,7 @@
+{
+    "python.analysis.extraPaths": [
+        "${workspaceFolder}"
+    ],
+    "python.defaultInterpreterPath": "python",
+    "python.analysis.typeCheckingMode": "off"
+}

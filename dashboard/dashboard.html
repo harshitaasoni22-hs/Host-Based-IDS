@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HIDS — Security Dashboard</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0d1117;
+    color: #e6edf3;
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 28px;
+    background: #161b22;
+    border-bottom: 1px solid #30363d;
+  }
+  .header-left { display: flex; align-items: center; gap: 14px; }
+  .shield {
+    width: 36px; height: 36px;
+    background: #1f6feb;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .header h1 { font-size: 18px; font-weight: 600; letter-spacing: -0.3px; }
+  .header p  { font-size: 12px; color: #8b949e; margin-top: 2px; }
+  .header-right { display: flex; align-items: center; gap: 20px; }
+
+  .status-badge {
+    display: flex; align-items: center; gap: 7px;
+    background: #0d4a1f;
+    border: 1px solid #238636;
+    border-radius: 20px;
+    padding: 5px 14px;
+    font-size: 13px; font-weight: 500; color: #3fb950;
+  }
+  .pulse {
+    width: 8px; height: 8px;
+    background: #3fb950; border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.5; transform: scale(0.8); }
+  }
+  .uptime { font-size: 13px; color: #8b949e; }
+  .uptime span { color: #e6edf3; font-weight: 500; }
+
+  /* ── Main layout ── */
+  .main { padding: 24px 28px; display: flex; flex-direction: column; gap: 20px; }
+
+  /* ── Stat cards ── */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+  }
+  .stat-card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    padding: 18px 20px;
+    cursor: default;
+    transition: border-color 0.2s;
+  }
+  .stat-card:hover { border-color: #58a6ff; }
+  .stat-label {
+    font-size: 12px; color: #8b949e;
+    display: flex; align-items: center; gap: 7px;
+    margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .stat-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .stat-num  { font-size: 32px; font-weight: 700; line-height: 1; }
+  .stat-sub  { font-size: 12px; color: #8b949e; margin-top: 6px; }
+
+  .dot-network   { background: #58a6ff; }
+  .dot-process   { background: #d2a8ff; }
+  .dot-log       { background: #ffa657; }
+  .dot-integrity { background: #ff7b72; }
+
+  .num-network   { color: #58a6ff; }
+  .num-process   { color: #d2a8ff; }
+  .num-log       { color: #ffa657; }
+  .num-integrity { color: #ff7b72; }
+
+  /* ── Middle row ── */
+  .middle-row { display: grid; grid-template-columns: 1fr 300px; gap: 14px; }
+
+  /* ── Alert feed ── */
+  .panel {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .panel-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid #30363d;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .panel-title { font-size: 14px; font-weight: 600; }
+  .panel-sub   { font-size: 12px; color: #8b949e; }
+
+  .alert-list { max-height: 320px; overflow-y: auto; }
+  .alert-list::-webkit-scrollbar { width: 4px; }
+  .alert-list::-webkit-scrollbar-track { background: transparent; }
+  .alert-list::-webkit-scrollbar-thumb { background: #30363d; border-radius: 2px; }
+
+  .alert-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 18px;
+    border-bottom: 1px solid #21262d;
+    animation: slideIn 0.3s ease;
+    transition: background 0.15s;
+  }
+  .alert-item:hover { background: #1c2128; }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .sev-badge {
+    font-size: 10px; font-weight: 700;
+    padding: 2px 7px; border-radius: 4px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    white-space: nowrap; margin-top: 1px;
+    flex-shrink: 0;
+  }
+  .sev-CRITICAL { background: #3d1a1a; color: #ff7b72; border: 1px solid #6e1a1a; }
+  .sev-HIGH     { background: #2d1f0a; color: #ffa657; border: 1px solid #6e3f0a; }
+  .sev-MEDIUM   { background: #0d2a4a; color: #58a6ff; border: 1px solid #0d4a8a; }
+  .sev-LOW      { background: #0d2a1a; color: #3fb950; border: 1px solid #0d4a1f; }
+
+  .alert-body { flex: 1; min-width: 0; }
+  .alert-type { font-size: 13px; font-weight: 600; color: #e6edf3; }
+  .alert-desc { font-size: 12px; color: #8b949e; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .alert-meta { font-size: 11px; color: #484f58; margin-top: 3px; }
+
+  .src-badge {
+    font-size: 10px; padding: 1px 6px; border-radius: 3px;
+    background: #21262d; color: #8b949e; white-space: nowrap;
+  }
+
+  .empty-state {
+    text-align: center; padding: 50px 20px;
+    color: #484f58; font-size: 14px;
+  }
+  .empty-state div { font-size: 28px; margin-bottom: 10px; }
+
+  /* ── Chart ── */
+  .chart-area { padding: 18px; }
+  .chart-bar-group { margin-bottom: 14px; }
+  .chart-label {
+    display: flex; justify-content: space-between;
+    font-size: 12px; margin-bottom: 5px;
+  }
+  .chart-label span:first-child { color: #8b949e; }
+  .chart-label span:last-child  { font-weight: 600; }
+  .bar-track {
+    height: 10px; background: #21262d;
+    border-radius: 5px; overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%; border-radius: 5px;
+    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .bar-critical { background: #da3633; }
+  .bar-high     { background: #d29922; }
+  .bar-medium   { background: #1f6feb; }
+  .bar-low      { background: #238636; }
+
+  /* ── Module status ── */
+  .module-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+  }
+  .module-card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    padding: 16px 18px;
+    transition: border-color 0.2s;
+  }
+  .module-card.running { border-color: #238636; }
+  .module-card.stopped { border-color: #6e1a1a; }
+  .module-name  { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .module-state {
+    font-size: 12px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .module-state.running { color: #3fb950; }
+  .module-state.stopped { color: #ff7b72; }
+  .module-alerts { font-size: 12px; color: #8b949e; margin-top: 6px; }
+
+  /* ── Footer ── */
+  .footer {
+    text-align: center; padding: 16px;
+    font-size: 12px; color: #484f58;
+    border-top: 1px solid #21262d;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="shield">&#128737;</div>
+    <div>
+      <h1>HIDS Security Dashboard</h1>
+      <p>Host Intrusion Detection System — Real-time Monitor</p>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="uptime">Uptime: <span id="uptime-val">00:00:00</span></div>
+    <div class="status-badge">
+      <div class="pulse"></div>
+      <span id="system-status">System Active</span>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- Stat cards -->
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="stat-label"><div class="stat-dot dot-network"></div>Network Monitor</div>
+      <div class="stat-num num-network" id="cnt-network">0</div>
+      <div class="stat-sub">alerts detected</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label"><div class="stat-dot dot-process"></div>Process Monitor</div>
+      <div class="stat-num num-process" id="cnt-process">0</div>
+      <div class="stat-sub">alerts detected</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label"><div class="stat-dot dot-log"></div>Log Monitor</div>
+      <div class="stat-num num-log" id="cnt-log">0</div>
+      <div class="stat-sub">alerts detected</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label"><div class="stat-dot dot-integrity"></div>File Integrity</div>
+      <div class="stat-num num-integrity" id="cnt-integrity">0</div>
+      <div class="stat-sub">alerts detected</div>
+    </div>
+  </div>
+
+  <!-- Middle row: feed + chart -->
+  <div class="middle-row">
+
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Live Alert Feed</div>
+        <div class="panel-sub" id="total-label">0 total alerts</div>
+      </div>
+      <div class="alert-list" id="alert-list">
+        <div class="empty-state">
+          <div>&#128274;</div>
+          No alerts yet — all systems clean
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Severity breakdown</div>
+      </div>
+      <div class="chart-area">
+        <div class="chart-bar-group">
+          <div class="chart-label">
+            <span>Critical</span><span id="n-critical" style="color:#ff7b72">0</span>
+          </div>
+          <div class="bar-track"><div class="bar-fill bar-critical" id="b-critical" style="width:0%"></div></div>
+        </div>
+        <div class="chart-bar-group">
+          <div class="chart-label">
+            <span>High</span><span id="n-high" style="color:#ffa657">0</span>
+          </div>
+          <div class="bar-track"><div class="bar-fill bar-high" id="b-high" style="width:0%"></div></div>
+        </div>
+        <div class="chart-bar-group">
+          <div class="chart-label">
+            <span>Medium</span><span id="n-medium" style="color:#58a6ff">0</span>
+          </div>
+          <div class="bar-track"><div class="bar-fill bar-medium" id="b-medium" style="width:0%"></div></div>
+        </div>
+        <div class="chart-bar-group">
+          <div class="chart-label">
+            <span>Low</span><span id="n-low" style="color:#3fb950">0</span>
+          </div>
+          <div class="bar-track"><div class="bar-fill bar-low" id="b-low" style="width:0%"></div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Module status -->
+  <div class="module-grid">
+    <div class="module-card" id="mod-network">
+      <div class="module-name">&#127760; Network Monitor</div>
+      <div class="module-state stopped" id="mod-network-state">&#11044; Stopped</div>
+      <div class="module-alerts" id="mod-network-alerts">0 alerts</div>
+    </div>
+    <div class="module-card" id="mod-process">
+      <div class="module-name">&#9881; Process Monitor</div>
+      <div class="module-state stopped" id="mod-process-state">&#11044; Stopped</div>
+      <div class="module-alerts" id="mod-process-alerts">0 alerts</div>
+    </div>
+    <div class="module-card" id="mod-log">
+      <div class="module-name">&#128196; Log Monitor</div>
+      <div class="module-state stopped" id="mod-log-state">&#11044; Stopped</div>
+      <div class="module-alerts" id="mod-log-alerts">0 alerts</div>
+    </div>
+    <div class="module-card" id="mod-integrity">
+      <div class="module-name">&#128274; File Integrity</div>
+      <div class="module-state stopped" id="mod-integrity-state">&#11044; Stopped</div>
+      <div class="module-alerts" id="mod-integrity-alerts">0 alerts</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  HIDS v1.0 — Refreshing every 3 seconds —
+  <span id="last-updated">connecting...</span>
+</div>
+
+<script>
+const API = 'http://127.0.0.1:5000/api';
+let lastAlertCount = 0;
+
+function sevClass(s) {
+  return ['CRITICAL','HIGH','MEDIUM','LOW'].includes(s) ? s : 'LOW';
+}
+
+function sourceLabel(src) {
+  const map = {
+    network: 'Network', process: 'Process',
+    log: 'Log', integrity: 'File'
+  };
+  return map[src] || src;
+}
+
+async function fetchAlerts() {
+  try {
+    const res = await fetch(API + '/alerts');
+    const alerts = await res.json();
+    const list = document.getElementById('alert-list');
+
+    if (alerts.length === 0) {
+      list.innerHTML = '<div class="empty-state"><div>&#128274;</div>No alerts yet — all systems clean</div>';
+      return;
+    }
+
+    if (alerts.length !== lastAlertCount) {
+      lastAlertCount = alerts.length;
+      let html = '';
+      alerts.forEach(a => {
+        const sev = sevClass(a.severity);
+        html += `
+          <div class="alert-item">
+            <div class="sev-badge sev-${sev}">${sev}</div>
+            <div class="alert-body">
+              <div class="alert-type">${a.alert_type}</div>
+              <div class="alert-desc">${a.description}</div>
+              <div class="alert-meta">
+                <span class="src-badge">${sourceLabel(a.source)}</span>
+                &nbsp;${a.timestamp}
+              </div>
+            </div>
+          </div>`;
+      });
+      list.innerHTML = html;
+
+      const counts = {CRITICAL:0, HIGH:0, MEDIUM:0, LOW:0};
+      alerts.forEach(a => { const s = sevClass(a.severity); counts[s]++; });
+      const max = Math.max(...Object.values(counts), 1);
+      ['CRITICAL','HIGH','MEDIUM','LOW'].forEach(s => {
+        const k = s.toLowerCase();
+        document.getElementById('n-' + k).textContent = counts[s];
+        document.getElementById('b-' + k).style.width = Math.round(counts[s] / max * 100) + '%';
+      });
+    }
+  } catch(e) {
+    document.getElementById('alert-list').innerHTML =
+      '<div class="empty-state"><div>&#128308;</div>Cannot connect to server.<br>Run run_dashboard.py first.</div>';
+  }
+}
+
+async function fetchStatus() {
+  try {
+    const res = await fetch(API + '/status');
+    const data = await res.json();
+
+    document.getElementById('uptime-val').textContent = data.uptime;
+    document.getElementById('total-label').textContent = data.total_alerts + ' total alerts';
+    document.getElementById('last-updated').textContent = 'Updated ' + data.timestamp;
+
+    const mods = data.modules;
+    ['network','process','log','integrity'].forEach(m => {
+      const info   = mods[m] || {status:'stopped', alerts:0};
+      const card   = document.getElementById('mod-' + m);
+      const state  = document.getElementById('mod-' + m + '-state');
+      const alrts  = document.getElementById('mod-' + m + '-alerts');
+      const isRun  = info.status === 'running';
+
+      card.className  = 'module-card ' + (isRun ? 'running' : 'stopped');
+      state.className = 'module-state ' + (isRun ? 'running' : 'stopped');
+      state.innerHTML = (isRun ? '&#11044; Running' : '&#11044; Stopped');
+      alrts.textContent = info.alerts + ' alerts';
+
+      const cnt = document.getElementById('cnt-' + m);
+      if (cnt) cnt.textContent = info.alerts;
+    });
+  } catch(e) {}
+}
+
+async function refresh() {
+  await fetchAlerts();
+  await fetchStatus();
+}
+
+refresh();
+setInterval(refresh, 3000);
+</script>
+</body>
+</html>
